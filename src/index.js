@@ -42,7 +42,7 @@ const parseDataForUser = (html) => {
 
   if (script !== undefined) {
     return normalizeData({
-      data: JSON.parse(Buffer.from(script.children[0].content, "base64")),
+      data: JSON.parse(Buffer.from(script.content, "base64")),
     });
   }
 
@@ -51,7 +51,7 @@ const parseDataForUser = (html) => {
   );
 
   if (script !== undefined) {
-    const data = JSON.parse(Buffer.from(script.content, "base64"))
+    const data = JSON.parse(Buffer.from(script.children[0].content, "base64"))
       .data.entity;
     return normalizeData({ data });
   }
