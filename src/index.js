@@ -26,6 +26,49 @@ const throwError = (message, html) => {
   throw error;
 };
 
+const parseDataForUser = (html) => {
+  const embed = parse(html);
+
+  let scripts = embed.find((el) => el.tagName === "html");
+  if (scripts === undefined) return throwError(ERROR.NOT_SCRIPTS, html);
+
+  scripts = scripts.children
+    .find((el) => el.tagName === "body")
+    .children.filter(({ tagName }) => tagName === "script");
+
+  let script = scripts.find((script) =>
+    script.attributes.some(({ value }) => value === "resource")
+  );
+
+  if (script !== undefined) {
+    return normalizeData({
+      data: JSON.parse(Buffer.from(script.children[0].content, "base64")),
+    });
+  }
+
+  script = scripts.find((script) =>
+    script.attributes.some(({ value }) => value === "initial-state")
+  );
+
+  if (script !== undefined) {
+    const data = JSON.parse(Buffer.from(script.content, "base64"))
+      .data.entity;
+    return normalizeData({ data });
+  }
+
+  script = scripts.find((script) =>
+    script.attributes.some(({ value }) => value === "__NEXT_DATA__")
+  );
+
+  if (script !== undefined) {
+    const string = Buffer.from(script.children[0].content);
+    const data = JSON.parse(string).props.pageProps.state?.data.entity;
+    if (data !== undefined) return normalizeData({ data });
+  }
+
+  return throwError(ERROR.NOT_DATA, html);
+};
+
 const parseData = (html) => {
   const embed = parse(html);
 
@@ -75,6 +118,14 @@ const createGetData = (fetch) => async (url, opts) => {
   const response = await fetch(embedURL, opts);
   const text = await response.text();
   return parseData(text);
+};
+
+const createGetDataForUser = (fetch) => async (url, opts) => {
+  const parsedUrl = getParsedUrl(url);
+  const embedURL = spotifyURI.formatEmbedURL(parsedUrl);
+  const response = await fetch(embedURL, opts);
+  const text = await response.text();
+  return parseDataForUser(text);
 };
 
 function getParsedUrl(url) {
@@ -154,6 +205,7 @@ const normalizeData = ({ data }) => {
 
 module.exports = (fetch) => {
   const getData = createGetData(fetch);
+  const getDataForUser = createGetDataForUser(fetch);
   return {
     getLink,
     getData,
@@ -171,6 +223,7 @@ module.exports = (fetch) => {
         originalData
       };
     },
+    getDataForUser
   };
 };
 
